@@ -1,88 +1,63 @@
-import perceptron
+import perceptron as perceptron
 import math
 import numpy as np
 
-learning_rate = 0.001
+LEARNING_RATE = 0.001
 
 def classify(mlp, inputs):
-    input_w = mlp[0]
-    hidden_w = mlp[1]
-    bias_w = mlp[2]
-    outputs = []
+    hidden_layer = mlp[0]
+    output_layer = mlp[1]
 
-    for i in range(len(inputs)):
-        hidden = [0 for x in range(len(hidden_w))]
-        for h in range(len(hidden_w)):
-            for j in range(len(input_w)):
-                # Possibly wrong input weight
-                hidden[h] += inputs[i][j] * input_w[i][j]
-            hidden[h] = sigmoid(hidden[h])
+    out = []
+    for input in inputs:
+        results = feedforward(input, hidden_layer, output_layer)
+        out.append(results[1])
 
-        output = 0
-        for h in range(len(hidden)):
-            output += hidden[h] * hidden_w[h]
-        output = sigmoid(output)
-        outputs.append(output)
+    return out
 
-    return outputs
 
 def train(M, data, targets):
-    # Setup up the MLP by initializing the input layer and hidden layer with random value weights
-    data_length = len(data[0])
 
-    bias = [np.random.uniform(), np.random.uniform()]
+    # Initialize all the weights in all units to random values
+    hidden_layer = []
+    for m in range(M):
+        hidden_layer.append(perceptron.initialize_perceptron(len(data[0]) + 1))
+    output_layer = perceptron.initialize_perceptron(M + 1)
 
-    # Initialize the hidden layer values to 0
-    Z = [0 for x in range(M)]
-    Z_weights = [np.random.uniform() for x in range(M)]
-
-    # Initialize the input layer weights for each perceptron related to a hidden unit
-    W = []
-    for i in range(data_length):
-        toAppend = []
-        for m in range(M):
-            toAppend.append(np.random.uniform())
-        W.append(toAppend)
-
-    # Condition: 100 iterations
     iter = 0
-    max_iter = 10
+    max_iter = 100
 
     while iter < max_iter:
 
-        outputs = []
         for d in range(len(data)):
-            # Calculate the values of the hidden units in the hidden layer
-            for i in range(M):
-                Z[i] += bias[0]
-                for j in range(data_length):
-                    Z[i] += data[d][j] * W[j][i]
-                Z[i] = sigmoid(Z[i])
+            point = data[d]
+            target = targets[d]
 
-            # Calculate the value of the output
-            out = bias[1]
-            for i in range(len(Z)):
-                out += Z[i] + Z_weights[i]
-            out = sigmoid(out)
+            # Compute the values for every unit in the network
+            hiddens, output = feedforward(point, hidden_layer, output_layer)
 
-            # Backprop
-            output_delta = out * (1 - out) * (targets[d] - out)
+            output_delta = output * (1-output) * (target - output)
 
-            for z in range(len(Z_weights)):
-                Z_weights[z] += output_delta*learning_rate*Z[z]
+            hidden_deltas = [hiddens[h] * (1-hiddens[h]) * (output_delta * output_layer.weights[h]) for h in range(len(hiddens))]
 
-            hidden_deltas = [Z[z]*(1-Z[z])*Z_weights[z] for z in range(len(Z))]
+            for i in range(len(output_layer.weights)):
+                output_layer.weights[i] += LEARNING_RATE * output_delta * output
 
-            for i in range(data_length):
-                for j in range(len(Z)):
-                    W[j][i] += learning_rate * hidden_deltas[j] * data[d][j]
 
-            outputs.append(out)
+            # For each hidden unit
+            for i in range(len(hidden_layer)):
+                # For each weight in the hidden unit
+                for j in range(len(hidden_layer[i].weights)):
+                    hidden_layer[i].weights[j] += LEARNING_RATE * hidden_deltas[i] * hiddens[i]
 
         iter += 1
 
-    return W, Z_weights, bias
+    return (hidden_layer, output_layer)
 
+def feedforward(input, hidden, output):
+    hiddens = [hidden[h](input) for h in range(len(hidden))]
+    output = output(hiddens)
+    return hiddens, output
 
 def sigmoid(t):
     return 1 / (1 + math.exp(-t))
